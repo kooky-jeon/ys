@@ -7,21 +7,16 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  console.log('[1] API Key exists:', !!apiKey);
-
   if (!apiKey) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set' });
   }
 
   try {
-    // 프론트에서 보낸 body를 그대로 쓰되, 모델은 서버에서 고정
     const requestBody = {
-      model: 'claude-3-5-haiku-20241022',   // 안정적인 모델로 고정
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
       messages: req.body.messages
     };
-
-    console.log('[2] Sending to Anthropic, messages count:', requestBody.messages?.length);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -33,20 +28,9 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify(requestBody)
     });
 
-    const responseText = await response.text();
-    console.log('[3] Anthropic status:', response.status);
-    console.log('[4] Anthropic body:', responseText.substring(0, 500));
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      return res.status(500).json({ error: 'Invalid JSON from Anthropic', raw: responseText.substring(0, 300) });
-    }
-
+    const data = await response.json();
     res.status(response.status).json(data);
   } catch (err) {
-    console.error('[ERROR]', err.message);
     res.status(500).json({ error: 'Fetch failed', detail: err.message });
   }
 };
