@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>기업 재무건강 체크 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --surface2: #f1efe8;
+    --border: rgba(0,0,0,0.1);
+    --border-em: rgba(0,0,0,0.2);
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-tertiary: #888780;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --green-bg: #eaf3de; --green-text: #3b6d11; --green-bar: #639922;
+    --yellow-bg: #faeeda; --yellow-text: #854f0b; --yellow-bar: #ba7517;
+    --red-bg: #fcebeb; --red-text: #a32d2d; --red-bar: #e24b4a;
+    --blue: #378add;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #242422;
+      --surface2: #2c2c2a;
+      --border: rgba(255,255,255,0.1);
+      --border-em: rgba(255,255,255,0.2);
+      --text-primary: #f1efe8;
+      --text-secondary: #b4b2a9;
+      --text-tertiary: #888780;
+      --green-bg: #173404; --green-text: #c0dd97; --green-bar: #639922;
+      --yellow-bg: #412402; --yellow-text: #fac775; --yellow-bar: #ba7517;
+      --red-bg: #501313; --red-text: #f7c1c1; --red-bar: #e24b4a;
+    }
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .app { max-width: 760px; margin: 0 auto; }
+
+  /* Header */
+  .header { margin-bottom: 2rem; }
+  .header h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .header p  { font-size: 14px; color: var(--text-secondary); }
+
+  /* Section label */
+  .section-title {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-tertiary); margin-bottom: 12px;
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Form */
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+  .form-group .hint { font-size: 11px; color: var(--text-tertiary); }
+  .required { color: var(--red-bar); }
+  .optional  { color: var(--text-tertiary); font-weight: 400; font-size: 12px; }
+
+  .form-group input,
+  .form-group select {
+    height: 38px; padding: 0 10px;
+    font-size: 14px; font-family: inherit;
+    border-radius: var(--radius-md);
+    border: 0.5px solid var(--border-em);
+    background: var(--surface);
+    color: var(--text-primary);
+    transition: border-color .15s, box-shadow .15s;
+    appearance: auto;
+  }
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(55,138,221,.15);
+  }
+
+  /* Button */
+  .btn-analyze {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; height: 44px; margin-top: 1.25rem;
+    background: var(--text-primary); color: var(--surface);
+    border: none; border-radius: var(--radius-md);
+    font-size: 15px; font-weight: 600; font-family: inherit;
+    cursor: pointer; transition: opacity .15s, transform .1s;
+  }
+  .btn-analyze:hover   { opacity: .85; }
+  .btn-analyze:active  { transform: scale(.98); }
+  .btn-analyze:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* Results */
+  .results { display: none; }
+  .results.visible { display: block; }
+
+  /* Indicator cards */
+  .indicators-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px; margin-bottom: 0;
+  }
+  @media (max-width: 500px) { .indicators-grid { grid-template-columns: 1fr; } }
+
+  .ind-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    position: relative; overflow: hidden;
+  }
+  .ind-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+  }
+  .ind-card.green::before  { background: var(--green-bar); }
+  .ind-card.yellow::before { background: var(--yellow-bar); }
+  .ind-card.red::before    { background: var(--red-bar); }
+
+  .ind-name  { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .ind-value { font-size: 24px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+  .ind-avg   { font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: var(--radius-md);
+    font-size: 12px; font-weight: 600;
+  }
+  .green  .badge { background: var(--green-bg);  color: var(--green-text); }
+  .yellow .badge { background: var(--yellow-bg); color: var(--yellow-text); }
+  .red    .badge { background: var(--red-bg);    color: var(--red-text); }
+
+  /* Chart */
+  .chart-wrap { position: relative; width: 100%; height: 340px; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    margin-bottom: 14px; font-size: 13px; color: var(--text-secondary);
+  }
+  .legend-item  { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* AI comment */
+  .comment-box {
+    background: var(--surface2);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    font-size: 14px; line-height: 1.8;
+    color: var(--text-primary);
+    min-height: 70px;
+    white-space: pre-wrap;
+  }
+  .comment-loading { color: var(--text-secondary); font-style: italic; }
+
+  /* Cursor blink */
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .cursor {
+    display: inline-block; width: 2px; height: 1em;
+    background: var(--text-secondary);
+    vertical-align: text-bottom;
+    animation: blink .9s step-end infinite;
+    margin-left: 2px;
+  }
+
+  /* Fade-up */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .fade-up { animation: fadeUp .4s ease both; }
+
+  /* Note text */
+  .note { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; }
+
+  /* Footer */
+  .footer { text-align: center; font-size: 12px; color: var(--text-tertiary); margin-top: 2.5rem; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>기업 재무건강 체크 대시보드</h1>
+    <p>재무 데이터를 입력하면 주요 지표를 자동 계산하고 업종 평균과 비교합니다</p>
+  </div>
+
+  <!-- Input Card -->
+  <div class="card">
+    <p class="section-title">재무 데이터 입력</p>
+    <div class="form-grid">
+
+      <div class="form-group">
+        <label>업종 선택 <span class="required">*</span></label>
+        <select id="industry">
+          <option value="">업종을 선택하세요</option>
+          <option value="manufacturing">제조업</option>
+          <option value="it">IT / 소프트웨어</option>
+          <option value="retail">유통 / 소매</option>
+          <option value="finance">금융 / 보험</option>
+          <option value="construction">건설업</option>
+          <option value="healthcare">의료 / 헬스케어</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>기업명 <span class="optional">(선택)</span></label>
+        <input type="text" id="company" placeholder="예: (주)테크스타" />
+      </div>
+
+      <div class="form-group">
+        <label>유동자산 (원) <span class="required">*</span></label>
+        <input type="number" id="current-assets" placeholder="예: 5000000000" />
+        <span class="hint">재무상태표 → 유동자산</span>
+      </div>
+
+      <div class="form-group">
+        <label>유동부채 (원) <span class="required">*</span></label>
+        <input type="number" id="current-liabilities" placeholder="예: 3000000000" />
+        <span class="hint">재무상태표 → 유동부채</span>
+      </div>
+
+      <div class="form-group">
+        <label>총부채 (원) <span class="required">*</span></label>
+        <input type="number" id="total-liabilities" placeholder="예: 8000000000" />
+        <span class="hint">재무상태표 → 부채총계</span>
+      </div>
+
+      <div class="form-group">
+        <label>자기자본 (원) <span class="required">*</span></label>
+        <input type="number" id="equity" placeholder="예: 12000000000" />
+        <span class="hint">재무상태표 → 자본총계</span>
+      </div>
+
+      <div class="form-group">
+        <label>당기순이익 (원) <span class="required">*</span></label>
+        <input type="number" id="net-income" placeholder="예: 1500000000" />
+        <span class="hint">손익계산서 → 당기순이익</span>
+      </div>
+
+      <div class="form-group">
+        <label>영업이익 (원) <span class="required">*</span></label>
+        <input type="number" id="operating-income" placeholder="예: 2000000000" />
+        <span class="hint">손익계산서 → 영업이익</span>
+      </div>
+
+      <div class="form-group">
+        <label>이자비용 (원) <span class="required">*</span></label>
+        <input type="number" id="interest-expense" placeholder="예: 200000000" />
+        <span class="hint">손익계산서 → 이자비용</span>
+      </div>
+
+    </div>
+    <button class="btn-analyze" id="analyze-btn" onclick="analyze()">
+      재무 분석 실행
+    </button>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+
+    <!-- Signal lights -->
+    <div class="card fade-up">
+      <p class="section-title">주요 지표 신호등 분석</p>
+      <div class="indicators-grid" id="indicators-grid"></div>
+    </div>
+
+    <!-- Radar chart -->
+    <div class="card fade-up" style="animation-delay:.08s">
+      <p class="section-title" style="margin-bottom:16px">업종 평균 비교 — 레이더 차트</p>
+      <div class="legend" id="chart-legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#378add"></div>내 기업
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#888780"></div>
+          <span id="legend-industry-name">업종 평균</span>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="radarChart" role="img"
+          aria-label="기업 지표와 업종 평균을 비교한 레이더 차트. 유동비율, 부채비율, ROE, 이자보상배율 4개 항목">
+        </canvas>
+      </div>
+      <p class="note" style="text-align:center">
+        * 수치는 업종 평균 대비 비율(%)로 정규화된 값입니다. 100 = 업종 평균 수준
+      </p>
+    </div>
+
+    <!-- AI Comment -->
+    <div class="card fade-up" style="animation-delay:.16s">
+      <p class="section-title" style="margin-bottom:12px">AI 재무 진단 코멘트</p>
+      <div class="comment-box" id="ai-comment">
+        <span class="comment-loading">AI가 재무 상태를 분석하고 있습니다</span><span class="cursor"></span>
+      </div>
+      <p class="note">* 본 진단은 참고용이며 전문 재무 자문을 대체하지 않습니다</p>
+    </div>
+
+  </div>
+
+  <div class="footer">기업 재무건강 체크 대시보드 · Claude AI 기반 자동 분석</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+  /* ── 업종별 벤치마크 ── */
+  const BENCHMARKS = {
+    manufacturing: { currentRatio:150, debtRatio:100, roe:8,  interestCoverage:5,  name:'제조업' },
+    it:            { currentRatio:200, debtRatio:60,  roe:15, interestCoverage:10, name:'IT/소프트웨어' },
+    retail:        { currentRatio:120, debtRatio:150, roe:10, interestCoverage:4,  name:'유통/소매' },
+    finance:       { currentRatio:110, debtRatio:400, roe:12, interestCoverage:3,  name:'금융/보험' },
+    construction:  { currentRatio:130, debtRatio:180, roe:7,  interestCoverage:3,  name:'건설업' },
+    healthcare:    { currentRatio:170, debtRatio:80,  roe:11, interestCoverage:8,  name:'의료/헬스케어' }
+  };
+
+  let radarInstance = null;
+
+  /* ── 신호 판정 ── */
+  function signal(val, avg, higherBetter) {
+    const r = val / avg;
+    if (higherBetter) return r > 1.1 ? 'green' : r >= 0.9 ? 'yellow' : 'red';
+    return r < 0.9 ? 'green' : r <= 1.1 ? 'yellow' : 'red';
+  }
+  function badgeLabel(s) {
+    return s === 'green' ? '✓ 양호' : s === 'yellow' ? '△ 주의' : '✕ 위험';
+  }
+
+  /* ── 분석 실행 ── */
+  function analyze() {
+    const industry = document.getElementById('industry').value;
+    const ca = parseFloat(document.getElementById('current-assets').value);
+    const cl = parseFloat(document.getElementById('current-liabilities').value);
+    const tl = parseFloat(document.getElementById('total-liabilities').value);
+    const eq = parseFloat(document.getElementById('equity').value);
+    const ni = parseFloat(document.getElementById('net-income').value);
+    const oi = parseFloat(document.getElementById('operating-income').value);
+    const ie = parseFloat(document.getElementById('interest-expense').value);
+
+    if (!industry) { alert('업종을 선택해 주세요.'); return; }
+    if ([ca,cl,tl,eq,ni,oi,ie].some(v => isNaN(v))) { alert('모든 필수 항목을 입력해 주세요.'); return; }
+    if (cl === 0 || eq === 0 || ie === 0) { alert('유동부채, 자기자본, 이자비용은 0이 될 수 없습니다.'); return; }
+
+    const bench = BENCHMARKS[industry];
+    const m = {
+      currentRatio:     (ca / cl) * 100,
+      debtRatio:        (tl / eq) * 100,
+      roe:              (ni / eq) * 100,
+      interestCoverage: oi / ie
+    };
+    const s = {
+      currentRatio:     signal(m.currentRatio,     bench.currentRatio,     true),
+      debtRatio:        signal(m.debtRatio,         bench.debtRatio,        false),
+      roe:              signal(m.roe,               bench.roe,              true),
+      interestCoverage: signal(m.interestCoverage,  bench.interestCoverage, true)
+    };
+
+    /* 신호등 카드 렌더 */
+    const inds = [
+      { name:'유동비율',            val: m.currentRatio.toFixed(1)+'%',      avg: bench.currentRatio+'%',         sig: s.currentRatio },
+      { name:'부채비율',            val: m.debtRatio.toFixed(1)+'%',         avg: bench.debtRatio+'%',            sig: s.debtRatio },
+      { name:'ROE (자기자본이익률)',  val: m.roe.toFixed(1)+'%',              avg: bench.roe+'%',                  sig: s.roe },
+      { name:'이자보상배율',         val: m.interestCoverage.toFixed(2)+'배', avg: bench.interestCoverage+'배',   sig: s.interestCoverage }
+    ];
+    document.getElementById('indicators-grid').innerHTML = inds.map(ind => `
+      <div class="ind-card ${ind.sig}">
+        <div class="ind-name">${ind.name}</div>
+        <div class="ind-value">${ind.val}</div>
+        <div class="ind-avg">업종 평균: ${ind.avg}</div>
+        <span class="badge">${badgeLabel(ind.sig)}</span>
+      </div>`).join('');
+
+    /* 범례 업종명 업데이트 */
+    document.getElementById('legend-industry-name').textContent = bench.name + ' 평균';
+
+    renderRadar(m, bench);
+
+    const resultsEl = document.getElementById('results');
+    resultsEl.classList.add('visible');
+    resultsEl.scrollIntoView({ behavior:'smooth', block:'start' });
+
+    const company = document.getElementById('company').value.trim() || '해당 기업';
+    generateComment(company, bench.name, m, s, bench);
+  }
+
+  /* ── 레이더 차트 ── */
+  function renderRadar(m, bench) {
+    if (radarInstance) radarInstance.destroy();
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    const normalize = (val, avg) => Math.min(200, Math.round((val / avg) * 100));
+    const myVals = [
+      normalize(m.currentRatio,     bench.currentRatio),
+      Math.min(200, Math.round((bench.debtRatio / Math.max(m.debtRatio, 0.01)) * 100)), /* 부채비율 역수 */
+      normalize(m.roe,              bench.roe),
+      normalize(m.interestCoverage, bench.interestCoverage)
+    ];
+
+    radarInstance = new Chart(document.getElementById('radarChart'), {
+      type: 'radar',
+      data: {
+        labels: ['유동비율', '부채비율(역지표)', 'ROE', '이자보상배율'],
+        datasets: [
+          {
+            label: '내 기업',
+            data: myVals,
+            borderColor: '#378add',
+            backgroundColor: 'rgba(55,138,221,0.18)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#378add',
+            pointRadius: 5,
+            pointHoverRadius: 7
+          },
+          {
+            label: '업종 평균',
+            data: [100, 100, 100, 100],
+            borderColor: '#888780',
+            backgroundColor: 'rgba(136,135,128,0.08)',
+            borderWidth: 1.5,
+            borderDash: [5, 4],
+            pointBackgroundColor: '#888780',
+            pointRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          r: {
+            min: 0, max: 200,
+            ticks: {
+              stepSize: 50,
+              font: { size: 11 },
+              color: '#888780',
+              callback: v => v + ''
+            },
+            grid:        { color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
+            angleLines:  { color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
+            pointLabels: { font: { size: 13 }, color: isDark ? '#b4b2a9' : '#5f5e5a' }
+          }
+        }
+      }
+    });
+  }
+
+  /* ── AI 코멘트 생성 ── */
+  async function generateComment(company, industry, m, s, bench) {
+    const el = document.getElementById('ai-comment');
+    el.innerHTML = '<span class="comment-loading">AI가 재무 상태를 분석하고 있습니다</span><span class="cursor"></span>';
+
+    const label = { green:'양호', yellow:'주의', red:'위험' };
+    const prompt = `당신은 재무 분석 전문가입니다. 아래 기업의 재무 지표를 분석하고 한국어로 간결하고 전문적인 진단 코멘트를 3~4문장으로 작성해 주세요.
+
+기업명: ${company}
+업종: ${industry}
+
+주요 지표:
+- 유동비율: ${m.currentRatio.toFixed(1)}% (업종 평균 ${bench.currentRatio}%, 상태: ${label[s.currentRatio]})
+- 부채비율: ${m.debtRatio.toFixed(1)}% (업종 평균 ${bench.debtRatio}%, 상태: ${label[s.debtRatio]})
+- ROE: ${m.roe.toFixed(1)}% (업종 평균 ${bench.roe}%, 상태: ${label[s.roe]})
+- 이자보상배율: ${m.interestCoverage.toFixed(2)}배 (업종 평균 ${bench.interestCoverage}배, 상태: ${label[s.interestCoverage]})
+
+강점과 약점을 명확히 언급하고 개선이 필요한 부분에 실질적인 조언을 포함해 주세요. 전문적이지만 이해하기 쉬운 언어로 작성하세요.`;
+
+    try {
+      const res = await fetch('/api/analyze', {   /* ← Vercel 프록시 엔드포인트 */
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const text = (data.content || []).map(c => c.text || '').join('').trim();
+      el.textContent = text || '분석 결과를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.';
+    } catch (err) {
+      el.textContent = `${company}의 재무 분석이 완료되었습니다. 신호등 지표를 기반으로 위험(빨강) 항목을 우선적으로 개선하고, 업종 평균 이하 지표에 대해 전문 재무 컨설턴트와 상담하시기를 권장합니다.\n\n(AI 코멘트 오류: ${err.message})`;
+    }
+  }
+</script>
+</body>
+</html>
