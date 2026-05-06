@@ -7,17 +7,21 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  // API 키 존재 여부 로그
-  console.log('API Key exists:', !!apiKey);
-  console.log('API Key prefix:', apiKey ? apiKey.substring(0, 14) : 'MISSING');
+  console.log('[1] API Key exists:', !!apiKey);
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set' });
   }
 
   try {
-    console.log('Calling Anthropic API...');
+    // 프론트에서 보낸 body를 그대로 쓰되, 모델은 서버에서 고정
+    const requestBody = {
+      model: 'claude-3-5-haiku-20241022',   // 안정적인 모델로 고정
+      max_tokens: 1000,
+      messages: req.body.messages
+    };
+
+    console.log('[2] Sending to Anthropic, messages count:', requestBody.messages?.length);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -26,25 +30,23 @@ module.exports = async function handler(req, res) {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(requestBody)
     });
 
     const responseText = await response.text();
-
-    // 응답 상태 로그
-    console.log('Anthropic response status:', response.status);
-    console.log('Anthropic response body:', responseText.substring(0, 300));
+    console.log('[3] Anthropic status:', response.status);
+    console.log('[4] Anthropic body:', responseText.substring(0, 500));
 
     let data;
     try {
       data = JSON.parse(responseText);
     } catch (e) {
-      return res.status(500).json({ error: 'Invalid JSON from Anthropic', raw: responseText.substring(0, 200) });
+      return res.status(500).json({ error: 'Invalid JSON from Anthropic', raw: responseText.substring(0, 300) });
     }
 
     res.status(response.status).json(data);
   } catch (err) {
-    console.error('Fetch error:', err.message);
-    res.status(500).json({ error: 'Internal server error', detail: err.message });
+    console.error('[ERROR]', err.message);
+    res.status(500).json({ error: 'Fetch failed', detail: err.message });
   }
 };
